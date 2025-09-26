@@ -1,0 +1,564 @@
+# 内部設計書：サーバー設計・API仕様
+
+サーバーサイドの内部設計書は、APIエンドポイントの詳細な実装仕様を記述し、フロントエンドエンジニアとバックエンドエンジニアが共通の理解を持てるよう橋渡しする重要なドキュメントです。
+
+## API仕様書の構成要素
+
+内部設計書におけるAPI仕様は、外部設計で定義されたエンドポイントを実装レベルまで詳細化し、以下の要素を含む必要があります。
+
+**基本情報**
+- API識別子とバージョン管理
+- 作成者・更新者の履歴管理
+- 変更理由と影響範囲
+
+**技術仕様**
+- HTTPメソッドとエンドポイントパス
+- リクエスト・レスポンス形式
+- 詳細な処理フロー
+
+**品質・セキュリティ**
+- 入力値チェックの詳細
+- 認証・認可の実装方法
+- エラーハンドリング仕様
+
+## 実践的なテンプレート## API仕様書作成のベストプラクティス
+
+### 処理フローの明確化
+API の各処理ステップを番号付きで整理し、それぞれの処理で何を行うのか、どのような条件でエラーになるのかを明確に記述します。特に複雑なビジネスロジックや複数のシステム間連携がある場合は、シーケンス図も併用すると理解しやすくなります。
+
+### エラーハンドリングの網羅性
+想定されるエラーパターンをすべて洗い出し、それぞれに対する適切なHTTPステータスコードとエラーメッセージを定義します。クライアントサイドでの適切な処理が可能になるよう、エラーコードも体系的に管理しましょう。
+
+### セキュリティ対策の具体化
+抽象的な「セキュリティに配慮する」ではなく、具体的にどのような脅威に対してどのような対策を講じるのかを明記します。OWASP Top 10などの標準的なセキュリティ指針を参考に、実装レベルでの対策を記述することが重要です。
+
+## データベース設計との整合性
+
+API仕様はデータベース設計と密接に関連するため、テーブル構造、インデックス設計、トランザクション境界などとの整合性を保つことが重要です。特に以下の点に注意しましょう：
+
+### トランザクション設計
+複数のテーブルを更新する処理では、どこからどこまでを一つのトランザクションとするかを明確に定義し、障害時のロールバック処理も含めて設計します。
+
+### 排他制御
+同時アクセスが予想される処理については、楽観的排他制御または悲観的排他制御のどちらを採用するかを決定し、デッドロック回避策も含めて設計します。
+
+## 新人エンジニアへの実装指針
+
+### 段階的な実装アプローチ
+1. **基本機能の実装**: まずはハッピーパスの処理を実装
+2. **バリデーション強化**: 入力値チェックを段階的に追加
+3. **エラーハンドリング**: 各種エラーケースに対応
+4. **パフォーマンス最適化**: 負荷テスト結果を基に改善
+
+### テスト実装の重要性
+API仕様書に記載された各処理ステップに対応する単体テストを作成し、仕様書通りの動作を保証することが重要です。特に境界値テストとエラーケーステストは入念に実施しましょう。
+
+### ログ・監視の実装
+本番運用を見据えて、適切なログ出力と監視項目の実装も仕様書の段階から計画することが重要です。障害発生時の原因特定や性能改善のための情報収集を考慮した設計を心がけましょう。
+
+内部設計書のAPI仕様は、開発者が迷わずに実装でき、かつ本番運用で安定稼働するシステムを構築するための重要な設計図です。上記のテンプレートを参考に、プロジェクトの特性に応じてカスタマイズして活用してください。
+
+ーーーーーーーーーーーーーーーーーーーーーーーーーーーーーー
+# 内部設計書：サーバー設計・API仕様
+
+## 基本情報
+- **チェック対象**: ユーザー登録API バリデーションチェック
+- **作成者**: 田中太郎
+- **作成日**: 2024/09/26
+- **更新者**: 田中太郎
+- **更新日**: 2024/09/26
+- **バージョン**: 1.0.0
+
+---
+
+## API仕様詳細
+
+### API基本情報
+- **API ID**: USER_REG_001
+- **API名称**: ユーザー登録API
+- **メソッド**: POST
+- **パス**: `/api/v1/users`
+- **API概要**: 新規ユーザーのアカウント登録処理を実行し、認証トークンを発行する
+
+### 処理記述
+
+#### 1. リクエスト受信
+**説明**: クライアントからのユーザー登録リクエストを受信し、基本的な形式チェックを実行
+
+##### 1-1. HTTPヘッダーチェック
+```
+チェック項目:
+- Content-Type: application/json が設定されているか
+- Content-Length: リクエストボディサイズが1MB以下か
+- User-Agent: 有効なクライアントからのリクエストか
+
+エラー時の処理:
+- HTTP 400 Bad Request を返却
+- エラーコード: INVALID_CONTENT_TYPE
+```
+
+##### 1-2. JSONパース処理
+```
+処理内容:
+1. リクエストボディをJSON形式でパース
+2. パース失敗時はエラーレスポンス返却
+3. 必須フィールドの存在チェック
+
+実装例:
+try {
+    const requestBody = JSON.parse(req.body);
+    if (!requestBody.email || !requestBody.password) {
+        throw new ValidationError('REQUIRED_FIELDS_MISSING');
+    }
+} catch (error) {
+    return res.status(400).json({
+        error_code: 'INVALID_JSON_FORMAT',
+        message: 'リクエスト形式が正しくありません'
+    });
+}
+```
+
+#### 2. 認証・認可チェック
+**説明**: APIアクセス権限の確認（このAPIは未認証でもアクセス可能）
+
+##### 2-1. レート制限チェック
+```
+チェック対象: IPアドレス単位でのリクエスト頻度制限
+制限値: 1時間あたり10回まで
+超過時処理:
+- HTTP 429 Too Many Requests を返却
+- Retry-After ヘッダーに待機時間を設定
+
+実装詳細:
+const rateLimitKey = `register_attempt_${clientIP}`;
+const currentCount = await redis.get(rateLimitKey) || 0;
+if (currentCount >= 10) {
+    return res.status(429).json({
+        error_code: 'RATE_LIMIT_EXCEEDED',
+        message: 'アクセス制限に達しました。1時間後に再試行してください',
+        retry_after: 3600
+    });
+}
+```
+
+#### 3. 入力値バリデーションチェック
+**説明**: リクエストデータの形式・内容の詳細チェック
+
+##### 3-1. メールアドレスチェック
+```
+チェック項目:
+1. 必須チェック: 空文字列・null・undefined でないか
+2. 形式チェック: RFC 5322準拠の正規表現によるチェック
+3. 長さチェック: 255文字以下であるか
+4. 禁止文字チェック: XSS攻撃に使用される文字が含まれていないか
+
+実装詳細:
+const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+if (!emailRegex.test(requestData.email)) {
+    errors.push({
+        field: 'email',
+        code: 'INVALID_EMAIL_FORMAT',
+        message: 'メールアドレスの形式が正しくありません'
+    });
+}
+```
+
+##### 3-2. パスワード強度チェック
+```
+チェック項目:
+1. 長さチェック: 8文字以上50文字以下
+2. 文字種チェック: 英字・数字・記号がそれぞれ1文字以上含まれる
+3. 辞書攻撃対策: 一般的なパスワード辞書との照合
+4. 個人情報チェック: メールアドレスの一部が含まれていないか
+
+実装詳細:
+const passwordValidation = {
+    minLength: 8,
+    maxLength: 50,
+    requireLowercase: true,
+    requireUppercase: true,
+    requireNumbers: true,
+    requireSymbols: true
+};
+
+if (!validatePasswordStrength(password, passwordValidation)) {
+    errors.push({
+        field: 'password',
+        code: 'WEAK_PASSWORD',
+        message: '英大小文字・数字・記号を含む8文字以上のパスワードを設定してください'
+    });
+}
+```
+
+#### 4. ビジネスロジックチェック
+**説明**: アプリケーション固有のビジネスルールに基づくチェック
+
+##### 4-1. メールアドレス重複チェック
+```
+処理内容:
+1. データベースで同一メールアドレスの既存ユーザーを検索
+2. 存在する場合はエラーレスポンス返却
+3. ソフトデリートされたユーザーの復旧処理も考慮
+
+実装詳細:
+const existingUser = await User.findOne({ 
+    email: requestData.email,
+    deleted_at: null 
+});
+
+if (existingUser) {
+    return res.status(409).json({
+        error_code: 'EMAIL_ALREADY_EXISTS',
+        message: 'このメールアドレスは既に登録済みです',
+        suggested_action: 'ログインページにお進みください'
+    });
+}
+```
+
+##### 4-2. 登録制限チェック
+```
+チェック項目:
+1. ドメイン制限: 企業内システムの場合、許可されたドメインか
+2. 招待制限: 招待コードが必要な場合の検証
+3. メンテナンス期間: システムメンテナンス中でないか
+
+実装例:
+const allowedDomains = ['company.com', 'partner.com'];
+const emailDomain = requestData.email.split('@')[1];
+if (!allowedDomains.includes(emailDomain)) {
+    return res.status(403).json({
+        error_code: 'DOMAIN_NOT_ALLOWED',
+        message: '許可されていないドメインです'
+    });
+}
+```
+
+#### 5. データベース処理
+**説明**: ユーザー情報の永続化処理
+
+##### 5-1. パスワードハッシュ化
+```
+処理内容:
+1. bcryptライブラリを使用したハッシュ化
+2. ソルト値は12ラウンド（セキュリティと性能のバランス）
+3. ハッシュ化失敗時のエラーハンドリング
+
+実装詳細:
+const saltRounds = 12;
+try {
+    const hashedPassword = await bcrypt.hash(requestData.password, saltRounds);
+    userData.password_hash = hashedPassword;
+} catch (hashError) {
+    logger.error('Password hashing failed', hashError);
+    return res.status(500).json({
+        error_code: 'INTERNAL_SERVER_ERROR',
+        message: 'システムエラーが発生しました'
+    });
+}
+```
+
+##### 5-2. ユーザーレコード作成
+```
+処理内容:
+1. トランザクション開始
+2. ユーザーテーブルにレコード挿入
+3. 初期設定テーブルにデフォルト値を設定
+4. コミット実行
+
+実装詳細:
+const transaction = await db.beginTransaction();
+try {
+    const user = await User.create({
+        email: requestData.email,
+        password_hash: hashedPassword,
+        email_verified: false,
+        created_at: new Date(),
+        updated_at: new Date()
+    }, { transaction });
+
+    await UserSettings.create({
+        user_id: user.id,
+        language: 'ja',
+        timezone: 'Asia/Tokyo',
+        email_notifications: true
+    }, { transaction });
+
+    await transaction.commit();
+    return user;
+} catch (dbError) {
+    await transaction.rollback();
+    throw dbError;
+}
+```
+
+#### 6. 認証トークン生成
+**説明**: JWT認証トークンの生成と発行
+
+##### 6-1. JWTペイロード構築
+```
+処理内容:
+1. ユーザーID、メールアドレス、権限情報をペイロードに設定
+2. 有効期限は24時間に設定
+3. 発行者（issuer）とオーディエンス（audience）を明示
+
+実装詳細:
+const payload = {
+    user_id: user.id,
+    email: user.email,
+    role: 'user',
+    email_verified: user.email_verified,
+    iat: Math.floor(Date.now() / 1000),
+    exp: Math.floor(Date.now() / 1000) + (24 * 60 * 60), // 24時間後
+    iss: 'user-management-api',
+    aud: 'user-management-client'
+};
+```
+
+##### 6-2. トークン署名・発行
+```
+処理内容:
+1. RS256アルゴリズムによる署名
+2. 秘密鍵は環境変数から取得
+3. トークン生成失敗時のエラーハンドリング
+
+実装詳細:
+const privateKey = process.env.JWT_PRIVATE_KEY;
+const token = jwt.sign(payload, privateKey, {
+    algorithm: 'RS256',
+    header: {
+        typ: 'JWT',
+        alg: 'RS256'
+    }
+});
+```
+
+#### 7. メール送信処理
+**説明**: 確認メールの送信処理
+
+##### 7-1. 確認トークン生成
+```
+処理内容:
+1. メール確認用の一時的なトークンを生成
+2. 有効期限は24時間
+3. データベースに確認トークンを保存
+
+実装詳細:
+const verificationToken = crypto.randomBytes(32).toString('hex');
+const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+await EmailVerification.create({
+    user_id: user.id,
+    token: verificationToken,
+    expires_at: expiresAt,
+    used: false
+});
+```
+
+##### 7-2. メール送信実行
+```
+処理内容:
+1. テンプレートエンジンによるHTML生成
+2. 外部メールサービス（SendGrid）経由で送信
+3. 送信失敗時はログ出力（ユーザー登録は継続）
+
+実装詳細:
+const emailTemplate = {
+    templateId: 'user_registration_confirmation',
+    personalizations: [{
+        to: [{ email: user.email }],
+        dynamic_template_data: {
+            user_name: user.email,
+            verification_url: `${FRONTEND_URL}/verify?token=${verificationToken}`,
+            expires_in_hours: 24
+        }
+    }]
+};
+
+try {
+    await sendgrid.send(emailTemplate);
+    logger.info(`Verification email sent to ${user.email}`);
+} catch (emailError) {
+    logger.error('Failed to send verification email', emailError);
+    // ユーザー登録は成功として継続
+}
+```
+
+#### 8. レスポンス生成
+**説明**: 成功時のレスポンスデータ構築
+
+##### 8-1. 成功レスポンス
+```
+レスポンス形式:
+HTTP/1.1 201 Created
+Content-Type: application/json
+
+{
+    "user": {
+        "id": 12345,
+        "email": "user@example.com",
+        "email_verified": false,
+        "created_at": "2024-09-26T10:30:00Z"
+    },
+    "token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "expires_in": 86400,
+    "message": "ユーザー登録が完了しました。確認メールをお送りしましたので、メール内のリンクをクリックしてください。"
+}
+```
+
+##### 8-2. エラーレスポンス
+```
+バリデーションエラー例:
+HTTP/1.1 400 Bad Request
+Content-Type: application/json
+
+{
+    "error_code": "VALIDATION_ERROR",
+    "message": "入力内容に誤りがあります",
+    "errors": [
+        {
+            "field": "email",
+            "code": "INVALID_EMAIL_FORMAT",
+            "message": "メールアドレスの形式が正しくありません"
+        },
+        {
+            "field": "password",
+            "code": "WEAK_PASSWORD",
+            "message": "パスワードが安全ではありません"
+        }
+    ],
+    "timestamp": "2024-09-26T10:30:00Z",
+    "request_id": "req_123456789"
+}
+```
+
+---
+
+## 補足・備考事項
+
+### セキュリティ考慮事項
+1. **CSRF対策**: CSRFトークンの検証（SPA の場合はSameSite Cookieで対応）
+2. **SQL インジェクション対策**: プリペアドステートメントの使用
+3. **XSS対策**: 入力値のサニタイゼーション
+4. **ブルートフォース攻撃対策**: レート制限とアカウントロック機能
+
+### パフォーマンス最適化
+```
+1. データベース最適化:
+   - email カラムにユニークインデックス作成
+   - created_at カラムにインデックス作成（レポート用）
+
+2. キャッシュ戦略:
+   - レート制限情報をRedisで管理
+   - ユーザー権限情報をメモリキャッシュ
+
+3. 非同期処理:
+   - メール送信は非同期で実行
+   - ログ出力も非同期キューで処理
+```
+
+### ログ出力仕様
+```
+レベル: INFO
+ユーザー登録成功時:
+{
+    "timestamp": "2024-09-26T10:30:00Z",
+    "level": "INFO",
+    "message": "User registration successful",
+    "user_id": 12345,
+    "email": "user@example.com",
+    "client_ip": "192.168.1.100",
+    "user_agent": "Mozilla/5.0...",
+    "request_id": "req_123456789"
+}
+
+レベル: ERROR  
+エラー発生時:
+{
+    "timestamp": "2024-09-26T10:30:00Z",
+    "level": "ERROR",
+    "message": "Database connection failed",
+    "error_code": "DB_CONNECTION_ERROR",
+    "stack_trace": "Error: Connection timeout...",
+    "request_id": "req_123456789"
+}
+```
+
+### 監視・アラート項目
+```
+1. レスポンス時間監視:
+   - 平均レスポンス時間が500ms以上でアラート
+   - 95パーセンタイルが1000ms以上でアラート
+
+2. エラー率監視:
+   - 5xx エラー率が5%以上でアラート
+   - 4xx エラー率が20%以上でアラート
+
+3. ビジネス指標監視:
+   - 1時間あたりの登録数が異常値の場合アラート
+   - メール送信失敗率が10%以上でアラート
+```
+
+### データベーススキーマ
+```sql
+-- ユーザーテーブル
+CREATE TABLE users (
+    id BIGSERIAL PRIMARY KEY,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    email_verified BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP NULL
+);
+
+-- インデックス
+CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_users_created_at ON users(created_at);
+CREATE INDEX idx_users_email_verified ON users(email_verified);
+
+-- メール確認テーブル
+CREATE TABLE email_verifications (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(id),
+    token VARCHAR(64) NOT NULL UNIQUE,
+    expires_at TIMESTAMP NOT NULL,
+    used BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_email_verifications_token ON email_verifications(token);
+CREATE INDEX idx_email_verifications_user_id ON email_verifications(user_id);
+```
+
+### 環境変数設定
+```bash
+# データベース設定
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=user_management
+DB_USER=api_user
+DB_PASSWORD=secure_password
+
+# JWT設定  
+JWT_PRIVATE_KEY=-----BEGIN PRIVATE KEY-----...
+JWT_PUBLIC_KEY=-----BEGIN PUBLIC KEY-----...
+
+# 外部サービス
+SENDGRID_API_KEY=SG.xxxxxxxxxxxxxxxx
+REDIS_URL=redis://localhost:6379
+
+# アプリケーション設定
+FRONTEND_URL=https://app.company.com
+API_BASE_URL=https://api.company.com
+```
+
+### 変更履歴管理
+| 日付 | 変更者 | バージョン | 変更内容 | 影響範囲 |
+|------|--------|----------|----------|---------|
+| 2024/09/26 | 田中太郎 | 1.0.0 | 初版作成 | 新規API |
+
+### 関連ドキュメント
+- 外部設計書: USER_EXT_001_ユーザー登録画面
+- データベース設計書: DB_DESIGN_001_ユーザー管理テーブル
+- セキュリティ設計書: SEC_DESIGN_001_認証仕様
+- テスト仕様書: TEST_SPEC_001_ユーザー登録API
