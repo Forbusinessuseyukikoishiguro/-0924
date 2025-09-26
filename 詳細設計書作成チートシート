@@ -1,0 +1,358 @@
+# 新人エンジニア向け：詳細設計書の作り方
+
+詳細設計書は、外部設計書をもとに実装レベルまで落とし込んだ技術仕様書です。開発者が迷うことなくコーディングできるよう、具体的で明確な情報を提供する重要なドキュメントです。
+
+## 詳細設計書の基本構成
+
+詳細設計書は以下の要素で構成されます：
+
+**基本情報**
+- システム名・機能名
+- 設定ファイル名（.yml等）
+- 作成者・作成日・更新日
+- バージョン情報
+
+**環境別設定**
+- 開発環境の設定内容
+- STG環境の設定内容
+- 本番環境の設定内容
+
+**詳細仕様**
+- データ構造定義
+- API仕様
+- アルゴリズム詳細
+- エラーハンドリング
+
+## 設定ファイル仕様の作成方法
+
+システムの動作を制御する設定ファイル（YAML、JSON、プロパティファイル等）の仕様を明確に定義することは、環境構築とデプロイの成功に直結します。
+
+### 環境別設定の重要性
+
+**開発環境（Development）**
+開発者が日常的に使用する環境で、デバッグやテストが容易に行えるよう設定します。ログレベルは詳細に、外部サービスはモック使用、データベースは開発専用を使用するのが一般的です。
+
+**ステージング環境（STG）**
+本番環境に近い条件でのテストを行う環境です。本番データのサニタイズ版を使用し、外部サービスとの連携テストも実施します。
+
+**本番環境（Production）**
+実際のユーザーがアクセスする環境で、パフォーマンス、セキュリティ、可用性が最優先されます。ログレベルは必要最小限、監視ツールとの連携も重要です。
+
+## 実践的なテンプレート## データベース設計の詳細化
+
+詳細設計では、外部設計で定義されたデータ構造を実装レベルまで詳細化します。
+
+### テーブル設計書
+
+**基本構成要素**
+- テーブル名（論理名・物理名）
+- カラム定義（データ型、制約、デフォルト値）
+- インデックス設計
+- 外部キー制約
+
+**記述例**
+```sql
+-- ユーザーテーブル
+CREATE TABLE users (
+    id BIGSERIAL PRIMARY KEY,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- インデックス
+CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_users_created_at ON users(created_at);
+```
+
+## API設計の詳細仕様
+
+外部設計で定義されたAPIエンドポイントについて、実装に必要な詳細情報を記述します。
+
+### リクエスト・レスポンス仕様
+
+**HTTPメソッドとエンドポイント**
+```
+POST /api/v1/users
+Content-Type: application/json
+
+-- リクエストボディ
+{
+    "email": "user@example.com",
+    "password": "securePassword123"
+}
+
+-- レスポンス（成功時）
+HTTP/1.1 201 Created
+{
+    "user_id": 12345,
+    "email": "user@example.com",
+    "created_at": "2024-09-26T10:30:00Z"
+}
+
+-- レスポンス（エラー時）
+HTTP/1.1 400 Bad Request
+{
+    "error_code": "VALIDATION_ERROR",
+    "message": "メールアドレスの形式が正しくありません",
+    "details": {
+        "field": "email",
+        "value": "invalid-email"
+    }
+}
+```
+
+## 新人エンジニアへの実践アドバイス
+
+### 段階的な詳細化
+最初から完璧な詳細設計を作ろうとせず、まずは基本的な構成を記述し、レビューを重ねながら徐々に詳細化していくことが重要です。
+
+### 実装者目線での記述
+コードを書く際に参照することを念頭に置き、「この情報があれば実装できる」レベルの具体性を保つことが大切です。
+
+### 設定管理の自動化検討
+手動での設定ファイル管理はミスの原因となりやすいため、Ansible、Terraform等のIaC（Infrastructure as Code）ツールの導入も検討しましょう。
+
+詳細設計書は開発の成功を左右する重要なドキュメントです。上記のテンプレートを参考に、プロジェクトの特性に応じてカスタマイズして活用してください。
+
+ーーーーーーーーーーーーーーーーーーーーーーーー
+# 詳細設計書：ユーザー管理システム
+
+## 基本情報
+- **システム名**: ユーザー管理システム
+- **設定ファイル名**: user_management_config.yml
+- **作成者**: 田中太郎
+- **作成日**: 2024/09/26
+- **更新日**: 2024/09/26
+- **バージョン**: 1.0.0
+
+## 1. 開発環境設定
+
+### ファイル名: development.yml
+
+| 行 | 記載内容 | 備考 |
+|----|---------|------|
+| 1 | `# 開発環境設定` | 設定ファイルの用途を明記 |
+| 2 | `environment: development` | 環境識別子 |
+| 3 | `server:` | サーバー設定開始 |
+| 4 | `  host: localhost` | 開発用ローカルホスト |
+| 5 | `  port: 3000` | 開発用ポート番号 |
+| 6 | `  ssl_enabled: false` | 開発環境はHTTPで動作 |
+| 7 | `database:` | データベース設定開始 |
+| 8 | `  host: localhost` | 開発用DBサーバー |
+| 9 | `  port: 5432` | PostgreSQL標準ポート |
+| 10 | `  name: user_mgmt_dev` | 開発用DB名 |
+| 11 | `  username: dev_user` | 開発用DBユーザー |
+| 12 | `  password: dev_password` | 開発用パスワード（平文OK） |
+| 13 | `  pool_size: 5` | 開発用コネクションプール |
+| 14 | `logging:` | ログ設定開始 |
+| 15 | `  level: debug` | デバッグレベル（最詳細） |
+| 16 | `  format: detailed` | 詳細フォーマット |
+| 17 | `  output: console` | コンソール出力 |
+| 18 | `  file_path: ./logs/dev.log` | ファイル出力先 |
+| 19 | `external_services:` | 外部サービス設定 |
+| 20 | `  email_service:` | メールサービス設定 |
+| 21 | `    provider: mock` | モックプロバイダー使用 |
+| 22 | `    api_key: dummy_key` | ダミーAPIキー |
+| 23 | `  payment_service:` | 決済サービス設定 |
+| 24 | `    provider: mock` | モック決済サービス |
+| 25 | `    endpoint: http://localhost:4000/mock` | モックエンドポイント |
+| 26 | `cache:` | キャッシュ設定 |
+| 27 | `  provider: memory` | インメモリキャッシュ |
+| 28 | `  ttl: 300` | TTL 5分 |
+| 29 | `security:` | セキュリティ設定 |
+| 30 | `  jwt_secret: dev_secret_key_123` | JWT署名キー（開発用） |
+| 31 | `  token_expiry: 3600` | トークン有効期限（1時間） |
+| 32 | `  rate_limit: 1000` | 開発用レート制限（緩め） |
+
+### 開発環境の特記事項
+- **デバッグ重視**: ログレベルをdebugに設定し、詳細な動作ログを出力
+- **モックサービス**: 外部サービスはモックを使用し、開発効率を向上
+- **セキュリティ緩和**: レート制限を緩くし、JWT秘密鍵も開発用の固定値を使用
+
+## 2. STG環境設定
+
+### ファイル名: staging.yml
+
+| 行 | 記載内容 | 備考 |
+|----|---------|------|
+| 1 | `# STG環境設定` | ステージング環境の設定 |
+| 2 | `environment: staging` | STG環境識別子 |
+| 3 | `server:` | サーバー設定開始 |
+| 4 | `  host: stg-user-mgmt.company.com` | STG専用ドメイン |
+| 5 | `  port: 443` | HTTPS標準ポート |
+| 6 | `  ssl_enabled: true` | SSL/TLS有効化 |
+| 7 | `  ssl_cert_path: /etc/ssl/certs/stg.crt` | SSL証明書パス |
+| 8 | `  ssl_key_path: /etc/ssl/private/stg.key` | SSL秘密鍵パス |
+| 9 | `database:` | データベース設定 |
+| 10 | `  host: stg-db.company.com` | STG用DBサーバー |
+| 11 | `  port: 5432` | PostgreSQL標準ポート |
+| 12 | `  name: user_mgmt_stg` | STG用DB名 |
+| 13 | `  username: ${DB_USER}` | 環境変数から取得 |
+| 14 | `  password: ${DB_PASSWORD}` | 環境変数から取得 |
+| 15 | `  pool_size: 20` | STG用コネクションプール |
+| 16 | `  ssl_mode: require` | DB接続もSSL必須 |
+| 17 | `logging:` | ログ設定開始 |
+| 18 | `  level: info` | 情報レベル |
+| 19 | `  format: json` | JSON形式（ログ解析ツール対応） |
+| 20 | `  output: file` | ファイル出力のみ |
+| 21 | `  file_path: /var/log/user-mgmt/stg.log` | STG用ログパス |
+| 22 | `  rotation: daily` | 日次ローテーション |
+| 23 | `external_services:` | 外部サービス設定 |
+| 24 | `  email_service:` | メールサービス |
+| 25 | `    provider: sendgrid` | SendGrid使用 |
+| 26 | `    api_key: ${SENDGRID_API_KEY}` | 環境変数から取得 |
+| 27 | `    sandbox_mode: true` | サンドボックスモード |
+| 28 | `  payment_service:` | 決済サービス |
+| 29 | `    provider: stripe` | Stripe使用 |
+| 30 | `    endpoint: https://api.stripe.com/v1` | Stripe API |
+| 31 | `    api_key: ${STRIPE_TEST_KEY}` | テスト用APIキー |
+| 32 | `cache:` | キャッシュ設定 |
+| 33 | `  provider: redis` | Redisクラスター |
+| 34 | `  host: stg-redis.company.com` | STG用Redisサーバー |
+| 35 | `  port: 6379` | Redis標準ポート |
+| 36 | `  ttl: 1800` | TTL 30分 |
+| 37 | `security:` | セキュリティ設定 |
+| 38 | `  jwt_secret: ${JWT_SECRET}` | 環境変数から取得 |
+| 39 | `  token_expiry: 1800` | トークン有効期限（30分） |
+| 40 | `  rate_limit: 100` | レート制限（本番に近い値） |
+| 41 | `monitoring:` | 監視設定 |
+| 42 | `  health_check_endpoint: /health` | ヘルスチェック |
+| 43 | `  metrics_enabled: true` | メトリクス収集有効 |
+| 44 | `  alerting_webhook: ${SLACK_WEBHOOK}` | アラート通知先 |
+
+### STG環境の特記事項
+- **本番模擬**: 本番に近い設定でテスト実施
+- **セキュリティ強化**: 機密情報は環境変数で管理
+- **監視機能**: ヘルスチェックとアラート機能を有効化
+
+## 3. 本番環境設定
+
+### ファイル名: production.yml
+
+| 行 | 記載内容 | 備考 |
+|----|---------|------|
+| 1 | `# 本番環境設定` | プロダクション環境 |
+| 2 | `environment: production` | 本番環境識別子 |
+| 3 | `server:` | サーバー設定開始 |
+| 4 | `  host: user-mgmt.company.com` | 本番ドメイン |
+| 5 | `  port: 443` | HTTPS標準ポート |
+| 6 | `  ssl_enabled: true` | SSL/TLS有効化 |
+| 7 | `  ssl_cert_path: /etc/ssl/certs/prod.crt` | 本番SSL証明書 |
+| 8 | `  ssl_key_path: /etc/ssl/private/prod.key` | 本番SSL秘密鍵 |
+| 9 | `  worker_processes: 4` | ワーカープロセス数 |
+| 10 | `  max_connections: 1000` | 最大同時接続数 |
+| 11 | `database:` | データベース設定 |
+| 12 | `  host: prod-db-master.company.com` | 本番マスターDB |
+| 13 | `  read_replica_host: prod-db-replica.company.com` | 読み取り専用レプリカ |
+| 14 | `  port: 5432` | PostgreSQL標準ポート |
+| 15 | `  name: user_mgmt_prod` | 本番DB名 |
+| 16 | `  username: ${DB_USER}` | 環境変数から取得 |
+| 17 | `  password: ${DB_PASSWORD}` | 環境変数から取得 |
+| 18 | `  pool_size: 50` | 本番用コネクションプール |
+| 19 | `  ssl_mode: require` | SSL接続必須 |
+| 20 | `  connection_timeout: 5000` | 接続タイムアウト（5秒） |
+| 21 | `  query_timeout: 30000` | クエリタイムアウト（30秒） |
+| 22 | `logging:` | ログ設定開始 |
+| 23 | `  level: warn` | 警告レベル以上のみ |
+| 24 | `  format: json` | JSON形式 |
+| 25 | `  output: file` | ファイル出力 |
+| 26 | `  file_path: /var/log/user-mgmt/prod.log` | 本番ログパス |
+| 27 | `  rotation: hourly` | 時間単位ローテーション |
+| 28 | `  max_file_size: 100MB` | ファイル最大サイズ |
+| 29 | `  retention_days: 30` | ログ保持期間 |
+| 30 | `external_services:` | 外部サービス設定 |
+| 31 | `  email_service:` | メールサービス |
+| 32 | `    provider: sendgrid` | SendGrid使用 |
+| 33 | `    api_key: ${SENDGRID_PROD_KEY}` | 本番APIキー |
+| 34 | `    sandbox_mode: false` | 実メール送信 |
+| 35 | `    rate_limit: 1000` | 送信レート制限 |
+| 36 | `  payment_service:` | 決済サービス |
+| 37 | `    provider: stripe` | Stripe使用 |
+| 38 | `    endpoint: https://api.stripe.com/v1` | Stripe本番API |
+| 39 | `    api_key: ${STRIPE_LIVE_KEY}` | 本番APIキー |
+| 40 | `    webhook_secret: ${STRIPE_WEBHOOK_SECRET}` | Webhook署名検証 |
+| 41 | `cache:` | キャッシュ設定 |
+| 42 | `  provider: redis_cluster` | Redis クラスター |
+| 43 | `  hosts:` | クラスターホスト |
+| 44 | `    - prod-redis-01.company.com:6379` | Redis ノード1 |
+| 45 | `    - prod-redis-02.company.com:6379` | Redis ノード2 |
+| 46 | `    - prod-redis-03.company.com:6379` | Redis ノード3 |
+| 47 | `  ttl: 3600` | TTL 1時間 |
+| 48 | `  max_memory_policy: allkeys-lru` | メモリ不足時のポリシー |
+| 49 | `security:` | セキュリティ設定 |
+| 50 | `  jwt_secret: ${JWT_SECRET_PROD}` | 本番JWT秘密鍵 |
+| 51 | `  token_expiry: 900` | トークン有効期限（15分） |
+| 52 | `  rate_limit: 60` | 厳格なレート制限 |
+| 53 | `  cors_origins:` | CORS許可オリジン |
+| 54 | `    - https://company.com` | メインサイト |
+| 55 | `    - https://admin.company.com` | 管理画面 |
+| 56 | `monitoring:` | 監視設定 |
+| 57 | `  health_check_endpoint: /health` | ヘルスチェック |
+| 58 | `  health_check_interval: 30` | チェック間隔（30秒） |
+| 59 | `  metrics_enabled: true` | メトリクス収集 |
+| 60 | `  prometheus_endpoint: /metrics` | Prometheus エンドポイント |
+| 61 | `  alerting:` | アラート設定 |
+| 62 | `    slack_webhook: ${SLACK_PROD_WEBHOOK}` | Slack通知 |
+| 63 | `    email_alerts: ${ALERT_EMAIL_LIST}` | メール通知先 |
+| 64 | `    pagerduty_key: ${PAGERDUTY_KEY}` | PagerDuty連携 |
+| 65 | `backup:` | バックアップ設定 |
+| 66 | `  enabled: true` | バックアップ有効 |
+| 67 | `  schedule: "0 2 * * *"` | 毎日2時に実行 |
+| 68 | `  retention_days: 90` | バックアップ保持期間 |
+| 69 | `  s3_bucket: ${BACKUP_S3_BUCKET}` | S3バケット |
+
+### 本番環境の特記事項
+- **高可用性**: DB レプリカ、Redis クラスター構成
+- **パフォーマンス**: 最適化されたコネクションプール、キャッシュ設定
+- **セキュリティ**: 厳格なレート制限、CORS設定
+- **運用性**: 詳細な監視、アラート、バックアップ機能
+
+## 4. 設定ファイル管理のベストプラクティス
+
+### 機密情報の管理
+```yaml
+# ✅ 良い例：環境変数を使用
+database:
+  password: ${DB_PASSWORD}
+  
+# ❌ 悪い例：平文で記載
+database:
+  password: super_secret_password
+```
+
+### 環境別の差分管理
+```yaml
+# 共通設定（base.yml）
+logging:
+  format: json
+  
+# 環境固有設定で上書き
+logging:
+  level: ${LOG_LEVEL:-info}  # デフォルト値付き
+```
+
+### 設定値の説明
+```yaml
+server:
+  port: 3000  # アプリケーションポート
+  timeout: 30  # リクエストタイムアウト（秒）
+```
+
+## 5. デプロイ時の注意事項
+
+### 設定ファイルの検証
+- YAML構文チェック
+- 必須パラメータの存在確認
+- 環境変数の設定確認
+
+### ロールバック対応
+- 設定変更前の旧ファイルをバックアップ
+- 設定変更による影響範囲の事前確認
+- 異常時の復旧手順の準備
+
+### 監視項目
+- アプリケーションの起動確認
+- ヘルスチェックエンドポイントの応答
+- ログ出力の正常性確認
