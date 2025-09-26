@@ -1,0 +1,544 @@
+# 内部設計書：フロント設計・プログラム処理記述
+
+内部設計書は、詳細設計をさらに具体化し、実際のプログラミング作業で直接参照できるレベルまで落とし込んだ技術仕様書です。フロントエンド開発においては、コンポーネントの責務、データフロー、外部連携などを明確に定義します。
+
+## 内部設計書の位置づけと重要性
+
+内部設計書は開発者が実装時に迷わないよう、コードレベルでの詳細な仕様を記述します。特にフロントエンド開発では、コンポーネントの階層構造、状態管理、API連携などの複雑な相互作用を整理することが重要です。
+
+### 記述すべき内容
+
+**コンポーネント設計**
+- コンポーネントの責務と境界
+- 親子関係とデータの受け渡し
+- 状態管理の方法と範囲
+
+**処理フロー**
+- ユーザーアクションから結果表示までの流れ
+- エラーハンドリングの詳細
+- 非同期処理の制御方法
+
+**外部連携**
+- API呼び出しの仕様
+- 外部ライブラリの使用方法
+- ブラウザAPIの活用
+
+## 実践的なテンプレート## 内部設計書作成のポイント
+
+### 実装者目線での詳細度
+内部設計書は実際にコードを書く開発者が参照するため、「この仕様書があれば迷わずに実装できる」レベルの具体性が必要です。抽象的な表現は避け、具体的なメソッド名、パラメータ、戻り値まで記述しましょう。
+
+### コンポーネント間の関係性の明確化
+フロントエンド開発では、親子コンポーネント間のデータの流れ、状態管理の責任範囲、イベントハンドリングの方法などを図表と文章で明確に示すことが重要です。
+
+### エラーハンドリングの網羅性
+予想されるエラーケースを洗い出し、それぞれに対する適切な処理方法を定義します。ユーザビリティを損なわない範囲で、詳細なエラー情報を提供することが大切です。
+
+## 新人エンジニアへの実践アドバイス
+
+### 段階的な詳細化の進め方
+1. **全体構造の把握**: まずは画面全体のコンポーネント構成を整理
+2. **データフローの整理**: データがどこから来てどこへ行くのかを追跡
+3. **詳細処理の記述**: 各処理の具体的なロジックを文書化
+4. **例外処理の追加**: エラーケースや境界値処理を補完
+
+### コードとドキュメントの一致
+実装が進むにつれて、実際のコードと設計書の内容に差異が生じることがあります。定期的に両者を照合し、設計書の更新を怠らないようにしましょう。
+
+### チーム内でのレビュー文化
+内部設計書は個人の理解だけでなく、チーム全体の開発効率に影響します。積極的にレビューを求め、他の開発者の視点からのフィードバックを取り入れることで、より良い設計書を作成できます。
+
+内部設計書は開発の最終段階における重要な道標となります。上記のテンプレートを参考に、プロジェクトの特性とチームの開発スタイルに合わせてカスタマイズして活用してください。
+
+
+ーーーーーーーーーーーーーーーー
+
+# 内部設計書：フロント設計・プログラム処理記述
+
+## 基本情報
+- **番号**: FE_001
+- **対象画面**: ユーザー登録画面
+- **作成者**: 田中太郎
+- **作成日**: 2024/09/26
+- **更新者**: 田中太郎
+- **更新日**: 2024/09/26
+- **バージョン**: 1.0.0
+
+---
+
+## コンポーネント設計詳細
+
+### 1. メインコンポーネント: UserRegistrationPage
+
+#### 基本情報
+- **コンポーネント名称**: UserRegistrationPage
+- **ファイルパス**: `/src/pages/UserRegistrationPage.tsx`
+- **概要**: 新規ユーザー登録処理を担当するページコンポーネント
+
+#### 子コンポーネント構成
+```
+UserRegistrationPage
+├── Header (共通ヘッダー)
+├── UserRegistrationForm (登録フォーム)
+│   ├── EmailInput (メール入力)
+│   ├── PasswordInput (パスワード入力)
+│   ├── PasswordConfirmInput (パスワード確認入力)
+│   └── SubmitButton (送信ボタン)
+├── ErrorMessage (エラー表示)
+└── LoadingSpinner (ローディング表示)
+```
+
+#### 入力データ
+| 項目名 | 型 | 必須 | 説明 | デフォルト値 |
+|--------|----|----- |------|------------|
+| redirectUrl | string | × | 登録完了後のリダイレクト先 | '/dashboard' |
+
+#### 状態管理（useState）
+| 状態名 | 型 | 初期値 | 説明 |
+|--------|-------|-------|------|
+| formData | UserFormData | `{email:'', password:'', passwordConfirm:''}` | フォーム入力データ |
+| errors | ValidationErrors | `{}` | バリデーションエラー |
+| isLoading | boolean | false | API通信中フラグ |
+| isSubmitted | boolean | false | 送信完了フラグ |
+
+#### 処理内容
+
+##### 初期化処理
+```typescript
+useEffect(() => {
+  // URLパラメータからリダイレクト先を取得
+  const params = new URLSearchParams(window.location.search);
+  const redirect = params.get('redirect_url') || '/dashboard';
+  setRedirectUrl(redirect);
+  
+  // 既にログイン済みの場合はリダイレクト
+  if (authContext.isAuthenticated) {
+    navigate('/dashboard');
+  }
+}, []);
+```
+
+##### フォーム送信処理
+```typescript
+const handleSubmit = async (formData: UserFormData) => {
+  try {
+    // 1. ローディング開始
+    setIsLoading(true);
+    setErrors({});
+    
+    // 2. クライアントサイドバリデーション
+    const validationResult = validateUserForm(formData);
+    if (!validationResult.isValid) {
+      setErrors(validationResult.errors);
+      return;
+    }
+    
+    // 3. API呼び出し
+    const response = await userAPI.register({
+      email: formData.email,
+      password: formData.password
+    });
+    
+    // 4. 成功時の処理
+    setIsSubmitted(true);
+    
+    // 5. 認証コンテキストを更新
+    authContext.setUser(response.user);
+    authContext.setToken(response.token);
+    
+    // 6. リダイレクト実行
+    setTimeout(() => {
+      navigate(redirectUrl);
+    }, 2000);
+    
+  } catch (error) {
+    // エラーハンドリング
+    handleAPIError(error);
+  } finally {
+    setIsLoading(false);
+  }
+};
+```
+
+#### 出力データ
+| 項目 | 条件 | 出力内容 |
+|------|------|---------|
+| 成功時 | 登録完了 | リダイレクト実行 + 成功メッセージ表示 |
+| エラー時 | バリデーションNG | エラーメッセージ表示 |
+| エラー時 | API通信失敗 | システムエラーメッセージ表示 |
+
+#### 外部メソッドとAPI
+| 呼び出し先 | メソッド | 目的 | パラメータ |
+|-----------|---------|------|----------|
+| userAPI | register | ユーザー登録 | `{email: string, password: string}` |
+| authContext | setUser | 認証状態更新 | User オブジェクト |
+| authContext | setToken | トークン設定 | JWT文字列 |
+| navigate | - | ページ遷移 | 遷移先URL |
+
+#### 補足事項
+- パスワード確認は送信時のみチェック（UX向上のため）
+- エラーメッセージは多言語対応を考慮した構造で実装
+- セッション管理はAuthContextで一元管理
+
+#### 変更履歴
+| 日付 | 変更者 | バージョン | 変更内容 | 理由 |
+|------|--------|-----------|---------|------|
+| 2024/09/26 | 田中太郎 | 1.0.0 | 初版作成 | 新規開発 |
+
+---
+
+### 2. 子コンポーネント: UserRegistrationForm
+
+#### 基本情報
+- **コンポーネント名称**: UserRegistrationForm
+- **ファイルパス**: `/src/components/forms/UserRegistrationForm.tsx`
+- **概要**: ユーザー登録フォームのUI表示とバリデーションを担当
+
+#### Props定義
+```typescript
+interface UserRegistrationFormProps {
+  onSubmit: (data: UserFormData) => Promise<void>;
+  errors: ValidationErrors;
+  isLoading: boolean;
+  isSubmitted: boolean;
+}
+```
+
+#### 入力データ（Props）
+| 項目名 | 型 | 必須 | 説明 |
+|--------|----|-----|------|
+| onSubmit | function | ○ | 送信時コールバック関数 |
+| errors | ValidationErrors | ○ | エラー情報オブジェクト |
+| isLoading | boolean | ○ | ローディング状態 |
+| isSubmitted | boolean | ○ | 送信完了状態 |
+
+#### 処理内容
+
+##### リアルタイムバリデーション
+```typescript
+const handleFieldChange = (field: keyof UserFormData, value: string) => {
+  // 1. フォームデータ更新
+  setFormData(prev => ({...prev, [field]: value}));
+  
+  // 2. リアルタイムバリデーション（パスワード強度のみ）
+  if (field === 'password') {
+    const strength = calculatePasswordStrength(value);
+    setPasswordStrength(strength);
+  }
+  
+  // 3. エラークリア（ユーザビリティ向上）
+  if (errors[field]) {
+    const newErrors = {...errors};
+    delete newErrors[field];
+    // 親コンポーネントには送信しない（内部エラー状態のみ）
+  }
+};
+```
+
+##### フォーカス離脱時バリデーション
+```typescript
+const handleFieldBlur = (field: keyof UserFormData) => {
+  const value = formData[field];
+  
+  switch (field) {
+    case 'email':
+      if (!isValidEmail(value)) {
+        setFieldError(field, 'メールアドレスの形式が正しくありません');
+      }
+      break;
+      
+    case 'password':
+      if (value.length < 8) {
+        setFieldError(field, 'パスワードは8文字以上で入力してください');
+      }
+      break;
+      
+    case 'passwordConfirm':
+      if (value !== formData.password) {
+        setFieldError(field, 'パスワードが一致しません');
+      }
+      break;
+  }
+};
+```
+
+#### 出力データ
+| 項目 | 説明 | 実装方法 |
+|------|------|---------|
+| onSubmit呼び出し | 親コンポーネントに送信データを渡す | `onSubmit(formData)` |
+| バリデーションエラー | フィールド単位のエラー表示 | エラー要素のレンダリング |
+
+#### 外部メソッドとAPI
+| 呼び出し先 | メソッド | 目的 |
+|-----------|---------|------|
+| validation | isValidEmail | メール形式チェック |
+| validation | calculatePasswordStrength | パスワード強度計算 |
+| props | onSubmit | 親への送信データ通知 |
+
+#### 補足事項
+- アクセシビリティ対応：aria-label、role属性を適切に設定
+- キーボード操作：Tab順序、Enterキーでの送信対応
+- レスポンシブ対応：モバイル表示時のレイアウト調整
+
+---
+
+### 3. 子コンポーネント: EmailInput
+
+#### 基本情報
+- **コンポーネント名称**: EmailInput
+- **ファイルパス**: `/src/components/inputs/EmailInput.tsx`
+- **概要**: メールアドレス入力専用のInputコンポーネント
+
+#### Props定義
+```typescript
+interface EmailInputProps {
+  value: string;
+  onChange: (value: string) => void;
+  onBlur: () => void;
+  error?: string;
+  disabled?: boolean;
+  autoComplete?: string;
+}
+```
+
+#### 処理内容
+
+##### 入力値の正規化
+```typescript
+const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  let value = e.target.value;
+  
+  // 1. 前後の空白を除去
+  value = value.trim();
+  
+  // 2. 全角文字を半角に変換
+  value = value.replace(/[Ａ-Ｚａ-ｚ０-９]/g, (s) => {
+    return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
+  });
+  
+  // 3. 親コンポーネントに通知
+  onChange(value);
+};
+```
+
+#### 外部メソッドとAPI
+なし（純粋なUI コンポーネント）
+
+#### 補足事項
+- IME対応：日本語入力確定時の適切な処理
+- ペースト対応：クリップボードからの貼り付け時の正規化
+- セキュリティ：XSS対策のためのサニタイゼーション
+
+---
+
+### 4. 外部API連携: userAPI.register
+
+#### 基本情報
+- **API名**: ユーザー登録API
+- **エンドポイント**: `POST /api/v1/users`
+- **実装ファイル**: `/src/api/userAPI.ts`
+
+#### 入力データ
+```typescript
+interface RegisterRequest {
+  email: string;      // RFC準拠のメールアドレス
+  password: string;   // 8文字以上50文字以下
+}
+```
+
+#### 処理内容
+```typescript
+export const register = async (data: RegisterRequest): Promise<RegisterResponse> => {
+  try {
+    // 1. リクエスト前処理
+    const config = {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      body: JSON.stringify(data)
+    };
+    
+    // 2. API呼び出し
+    const response = await fetch(`${API_BASE_URL}/users`, config);
+    
+    // 3. レスポンス処理
+    if (!response.ok) {
+      throw new APIError(response.status, await response.json());
+    }
+    
+    // 4. 成功レスポンス返却
+    return await response.json();
+    
+  } catch (error) {
+    // 5. エラーハンドリング
+    if (error instanceof APIError) {
+      throw error;
+    }
+    
+    throw new APIError(500, {
+      error_code: 'NETWORK_ERROR',
+      message: 'ネットワークエラーが発生しました'
+    });
+  }
+};
+```
+
+#### 出力データ
+```typescript
+interface RegisterResponse {
+  user: {
+    id: number;
+    email: string;
+    created_at: string;
+  };
+  token: string;
+  expires_in: number;
+}
+```
+
+#### エラーレスポンス
+| HTTPステータス | エラーコード | 説明 |
+|---------------|-------------|------|
+| 400 | VALIDATION_ERROR | バリデーションエラー |
+| 409 | EMAIL_ALREADY_EXISTS | メールアドレス重複 |
+| 429 | RATE_LIMIT_EXCEEDED | レート制限超過 |
+| 500 | INTERNAL_SERVER_ERROR | サーバー内部エラー |
+
+---
+
+## 5. 共通処理・ユーティリティ
+
+### バリデーション処理: validateUserForm
+
+#### 処理内容
+```typescript
+interface ValidationResult {
+  isValid: boolean;
+  errors: ValidationErrors;
+}
+
+export const validateUserForm = (data: UserFormData): ValidationResult => {
+  const errors: ValidationErrors = {};
+  
+  // メールアドレス検証
+  if (!data.email) {
+    errors.email = 'メールアドレスを入力してください';
+  } else if (!isValidEmail(data.email)) {
+    errors.email = 'メールアドレスの形式が正しくありません';
+  }
+  
+  // パスワード検証
+  if (!data.password) {
+    errors.password = 'パスワードを入力してください';
+  } else if (data.password.length < 8) {
+    errors.password = 'パスワードは8文字以上で入力してください';
+  } else if (!hasValidPasswordStrength(data.password)) {
+    errors.password = '英字、数字、記号を含めてください';
+  }
+  
+  // パスワード確認検証
+  if (data.password !== data.passwordConfirm) {
+    errors.passwordConfirm = 'パスワードが一致しません';
+  }
+  
+  return {
+    isValid: Object.keys(errors).length === 0,
+    errors
+  };
+};
+```
+
+### エラーハンドリング: handleAPIError
+
+#### 処理内容
+```typescript
+export const handleAPIError = (error: APIError): void => {
+  // 1. エラーログ出力
+  console.error('API Error:', error);
+  
+  // 2. エラー種別による処理分岐
+  switch (error.status) {
+    case 400:
+      // バリデーションエラーは個別に表示
+      if (error.data.details) {
+        setErrors(error.data.details);
+      } else {
+        showErrorMessage(error.data.message);
+      }
+      break;
+      
+    case 409:
+      // メール重複エラー
+      setErrors({ email: 'このメールアドレスは既に登録済みです' });
+      break;
+      
+    case 429:
+      // レート制限エラー
+      showErrorMessage('アクセスが集中しています。しばらく経ってから再度お試しください。');
+      break;
+      
+    default:
+      // システムエラー
+      showErrorMessage('システムエラーが発生しました。管理者にお問い合わせください。');
+      break;
+  }
+};
+```
+
+---
+
+## 6. 実装時の注意事項
+
+### TypeScript型定義
+```typescript
+// フォームデータ型
+interface UserFormData {
+  email: string;
+  password: string;
+  passwordConfirm: string;
+}
+
+// バリデーションエラー型
+interface ValidationErrors {
+  [key: string]: string;
+}
+
+// API エラー型
+class APIError extends Error {
+  constructor(
+    public status: number,
+    public data: any
+  ) {
+    super(`API Error: ${status}`);
+  }
+}
+```
+
+### テスト実装方針
+- **単体テスト**: 各コンポーネントの独立したテスト
+- **結合テスト**: API連携を含む画面全体のテスト
+- **E2Eテスト**: ユーザーシナリオベースのテスト
+
+### パフォーマンス対策
+- **メモ化**: React.memo、useMemo、useCallbackの適切な使用
+- **遅延ローディング**: React.lazy によるコンポーネント分割
+- **バンドル最適化**: 不要なライブラリの除外
+
+---
+
+## 7. 変更管理
+
+### 変更時の影響範囲
+| 変更対象 | 影響を受ける可能性があるファイル |
+|---------|---------------------------|
+| API仕様変更 | userAPI.ts, UserRegistrationPage.tsx |
+| バリデーション変更 | validation.ts, UserRegistrationForm.tsx |
+| UI変更 | 個別コンポーネントファイル |
+
+### レビューポイント
+- TypeScript型安全性の確保
+- エラーハンドリングの網羅性
+- アクセシビリティ対応の適切性
+- テストカバレッジの確保
